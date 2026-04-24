@@ -8,4 +8,4 @@ const {
 router.post("/initialize", initializePayment);
 router.post("/verify", verifyPayment);
 
-module.exports = router;
+export default router;
