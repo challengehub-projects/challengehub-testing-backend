@@ -11,6 +11,7 @@ exports.initializePayment = async (req, res) => {
       {
         email,
         amount: amount * 100, // Paystack uses kobo
+        callback_url: "https://chall"
       },
       {
         headers: {

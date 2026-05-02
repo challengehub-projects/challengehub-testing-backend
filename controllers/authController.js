@@ -1,17 +1,26 @@
 import axios from "axios";
 import { admin, db, auth } from "../config/firebase.js";
 import dotenv from "dotenv";
+import express from "express";
+import cors from "cors";
+
 
 dotenv.config();
+
+const app = express();
+
+app.use(cors());
+
+app.use(express.json());
 
 const API_KEY = process.env.FIREBASE_API_KEY;
 
 /* -------- SIGNUP -------- */
 export const signup = async (req, res) => {
   try {
-    const { email, password, name, userCategory } = req.body;
+    const { email, password, surname, otherNames, category, state, lga, phone } = req.body;
 
-    if (!email || !password || !name) {
+    if (!email || !password) {
       return res.status(400).json({
         success: false,
         message: "Please fill all required fields",
@@ -24,22 +33,27 @@ export const signup = async (req, res) => {
     });
 
     await db.collection("users").doc(user.uid).set({
-      name,
+      surname,
+      otherNames,
       email,
-      userCategory: userCategory || "student",
+      category: category || "unknown",
       role: "student",
       paymentStatus: "paid",
       hasTakenQuiz: false,
+      state,
+      lga,
+      phone,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
     return res.status(201).json({
       success: true,
-      message: "User created successfully 🎉",
+      message: "User created successfully",
       uid: user.uid,
     });
 
   } catch (err) {
+    console.log(err);
     return res.status(400).json({
       success: false,
       message: err.message,
@@ -63,7 +77,7 @@ export const login = async (req, res) => {
 
     return res.json({
       success: true,
-      message: "Login successful 🚀",
+      message: "Login successful",
       token: response.data.idToken,
       refreshToken: response.data.refreshToken,
       userId: response.data.localId,
@@ -160,5 +174,143 @@ export const getUserByUid = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Error fetching user" });
+  }
+};
+
+
+
+// ✅ PARTIAL UPDATE ACCOUNT
+/* export const updateAccount = async (req, res) => {
+  const uid = req.user.uid;
+
+  const {
+    email,
+    displayName,
+    phone,
+    state,
+    lga,
+    category,
+  } = req.body;
+
+  try {
+    // 🔹 Build dynamic update object for Firebase Auth
+    const authUpdateData = {};
+    if (email) authUpdateData.email = email;
+    if (displayName) authUpdateData.displayName = displayName;
+
+    // Only call if something exists
+    if (Object.keys(authUpdateData).length > 0) {
+      await admin.auth().updateUser(uid, authUpdateData);
+    }
+
+    // 🔹 Build dynamic Firestore update
+    const firestoreData = {};
+    if (email) firestoreData.email = email;
+    if (displayName) firestoreData.name = displayName;
+    if (phone) firestoreData.phone = phone;
+    if (state) firestoreData.state = state;
+    if (lga) firestoreData.lga = lga;
+    if (category) firestoreData.category = category;
+
+    firestoreData.updatedAt =
+      admin.firestore.FieldValue.serverTimestamp();
+
+    if (Object.keys(firestoreData).length > 0) {
+      await admin
+        .firestore()
+        .collection("users")
+        .doc(uid)
+        .set(firestoreData, { merge: true });
+    }
+
+    res.json({ message: "Account updated successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to update account" });
+  }
+};
+ */
+// ✅ PARTIAL UPDATE ACCOUNT
+export const updateAccount = async (req, res) => {
+  try {
+    const uid = req.user.uid;
+
+    const {
+      email,
+      displayName,
+      phone,
+      state,
+      lga,
+      category,
+    } = req.body;
+
+    console.log("BODY RECEIVED:", req.body);
+
+    // 🔹 Firebase Auth update
+    const authUpdateData = {};
+
+    if (email) authUpdateData.email = email;
+    if (displayName) authUpdateData.displayName = displayName;
+
+    if (Object.keys(authUpdateData).length > 0) {
+      await admin.auth().updateUser(uid, authUpdateData);
+    }
+
+    // 🔹 Firestore update
+    const firestoreData = {};
+
+    if (email) firestoreData.email = email;
+    if (displayName) firestoreData.name = displayName;
+    if (phone) firestoreData.phone = phone;
+    if (state) firestoreData.state = state;
+    if (lga) firestoreData.lga = lga;
+    if (category) firestoreData.category = category;
+
+    firestoreData.updatedAt =
+      admin.firestore.FieldValue.serverTimestamp();
+
+    if (Object.keys(firestoreData).length > 0) {
+      await admin
+        .firestore()
+        .collection("users")
+        .doc(uid)
+        .set(firestoreData, { merge: true });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Account updated successfully",
+    });
+
+  } catch (err) {
+    console.error("UPDATE ERROR:", err);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to update account",
+    });
+  }
+};
+
+
+// DELETE ACCOUNT
+export const deleteAccount = async (req, res) => {
+  const uid = req.user.uid;
+
+  try {
+    // 🔹 Delete Firestore data first
+    await admin
+      .firestore()
+      .collection("users")
+      .doc(uid)
+      .delete()
+      .catch(() => { }); // avoid crash if doc doesn't exist
+
+    // 🔹 Delete Firebase Auth user
+    await admin.auth().deleteUser(uid);
+
+    res.json({ message: "Account deleted successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to delete account" });
   }
 };
